@@ -1,0 +1,5 @@
+.env
+*.auto.pkrvars.hcl
+packer/output-*/
+packer/*.box
+.DS_Store

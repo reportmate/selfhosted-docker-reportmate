@@ -1,0 +1,62 @@
+name: reportmate
+
+# Self-hosted ReportMate: web dashboard + API + PostgreSQL.
+# Pulls published images from GHCR. Override the tag with REPORTMATE_TAG.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reportmate
+      POSTGRES_USER: reportmate
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reportmate -d reportmate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks: [reportmate]
+
+  api:
+    image: ghcr.io/reportmate/api:${REPORTMATE_TAG:-latest}
+    environment:
+      DATABASE_URL: postgresql://reportmate:${DB_PASSWORD:?set DB_PASSWORD in .env}@postgres:5432/reportmate
+      DB_SSL: "false"
+      API_INTERNAL_SECRET: ${API_INTERNAL_SECRET:?set API_INTERNAL_SECRET in .env}
+      REPORTMATE_PASSPHRASE: ${REPORTMATE_PASSPHRASE:?set REPORTMATE_PASSPHRASE in .env}
+      CORS_ORIGINS: ${PUBLIC_URL:-http://localhost:3000}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [reportmate]
+
+  web:
+    image: ghcr.io/reportmate/web:${REPORTMATE_TAG:-latest}
+    environment:
+      NODE_ENV: production
+      API_BASE_URL: http://api:8000
+      API_INTERNAL_SECRET: ${API_INTERNAL_SECRET:?set API_INTERNAL_SECRET in .env}
+      REPORTMATE_PASSPHRASE: ${REPORTMATE_PASSPHRASE:?set REPORTMATE_PASSPHRASE in .env}
+      NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_DEMO_MODE: ${DEMO_MODE:-true}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks: [reportmate]
+
+volumes:
+  postgres_data:
+
+networks:
+  reportmate:
+    driver: bridge
