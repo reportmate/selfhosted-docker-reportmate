@@ -22,7 +22,7 @@ services:
     networks: [reportmate]
 
   api:
-    image: ghcr.io/reportmate/api:${REPORTMATE_TAG:-latest}
+    image: ghcr.io/reportmate/reportmate-api:${REPORTMATE_TAG:-latest}
     environment:
       DATABASE_URL: postgresql://reportmate:${DB_PASSWORD:?set DB_PASSWORD in .env}@postgres:5432/reportmate
       DB_SSL: "false"

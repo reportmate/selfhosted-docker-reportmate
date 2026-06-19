@@ -3,3 +3,5 @@
 packer/output-*/
 packer/*.box
 .DS_Store
+
+/.worktrees/

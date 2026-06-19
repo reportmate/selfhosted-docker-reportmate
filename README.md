@@ -8,7 +8,7 @@ Run ReportMate on your own infrastructure: the Next.js dashboard, the FastAPI in
 Images are published to GitHub Container Registry:
 
 - `ghcr.io/reportmate/web`
-- `ghcr.io/reportmate/api`
+- `ghcr.io/reportmate/reportmate-api`
 
 ## Quick start (Docker Compose)
 
@@ -33,7 +33,7 @@ Open the dashboard at http://localhost:3000. The API is at http://localhost:8000
 | Service | Port | Image |
 |---|---|---|
 | web | 3000 | `ghcr.io/reportmate/web` |
-| api | 8000 | `ghcr.io/reportmate/api` |
+| api | 8000 | `ghcr.io/reportmate/reportmate-api` |
 | postgres | 5432 | `postgres:16-alpine` |
 
 ## Authentication
