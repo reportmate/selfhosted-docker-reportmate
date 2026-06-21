@@ -77,3 +77,7 @@ Tear down and remove the database volume to start clean:
 ```
 docker compose down -v
 ```
+
+## License
+
+This deployment tooling — the Compose files, Packer templates, schema, and scripts in this repo — is MIT licensed (see [LICENSE](LICENSE)), like the ReportMate Terraform modules. The application images it pulls are licensed separately: the server (API and dashboard) under AGPL-3.0, the clients under MIT.
