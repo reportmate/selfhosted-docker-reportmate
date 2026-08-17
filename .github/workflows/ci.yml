@@ -1,0 +1,45 @@
+name: CI
+
+# Validates the self-host appliance definition. This repo CONSUMES the published
+# GHCR images (ghcr.io/reportmate/web + /api) -- it does not build or publish
+# them -- so there is no image publish step here. CI just checks that the
+# compose file, the Packer template, and the provisioning script are well-formed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose
+        run: |
+          # compose interpolates required (:?) vars; .env.example supplies them.
+          cp .env.example .env
+          docker compose config --quiet
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@v3
+
+      - name: Packer fmt (report-only)
+        continue-on-error: true
+        run: packer fmt -check -diff packer/
+
+      - name: Packer init + validate
+        run: |
+          packer init packer/reportmate.pkr.hcl
+          packer validate packer/
+
+      - name: ShellCheck provisioning script
+        run: shellcheck --severity=error packer/setup.sh
