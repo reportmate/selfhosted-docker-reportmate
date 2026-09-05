@@ -40,7 +40,17 @@ Open the dashboard at http://localhost:3000. The API is at http://localhost:8000
 
 The dashboard ships in **demo mode** (`DEMO_MODE=true`) so it runs without configuring Microsoft Entra ID — sign-in is bypassed and settings are read-only. This is the fastest way to evaluate.
 
-For real sign-in and editable settings, set `DEMO_MODE=false` and provide the Entra ID variables (`AZURE_AD_CLIENT_ID`, `AZURE_AD_CLIENT_SECRET`, `AZURE_AD_TENANT_ID`, `NEXTAUTH_URL`) to the `web` service, and set `SETTINGS_ADMIN_ROLES` to your admin role.
+For real sign-in and editable settings, set `DEMO_MODE=false` and provide the
+Entra ID variables (`AZURE_AD_CLIENT_ID`, `AZURE_AD_CLIENT_SECRET`,
+`AZURE_AD_TENANT_ID`, `NEXTAUTH_URL`) to the `web` service.
+
+Admin access is not configured by an environment variable. The dashboard
+checks for the literal role `admin` in the `roles` claim of the signed-in
+user's token. Define an app role with the value `admin` on your Entra app
+registration and assign it to the users or groups who should administer the
+instance; they must sign out and back in for the new claim to appear. Users
+without that role can sign in and read the dashboard, but settings stay
+read-only.
 
 ## Pinning a version
 
