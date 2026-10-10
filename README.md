@@ -38,7 +38,15 @@ Open the dashboard at http://localhost:3000. The API is at http://localhost:8000
 
 ## Authentication
 
-The dashboard ships in **demo mode** (`DEMO_MODE=true`) so it runs without configuring Microsoft Entra ID — sign-in is bypassed and settings are read-only. This is the fastest way to evaluate.
+The dashboard ships in **demo mode** so it runs without configuring Microsoft Entra ID — sign-in is bypassed and settings are read-only. This is the fastest way to evaluate.
+
+Demo mode is controlled by `DEMO_MODE` in `.env`, which compose passes to the `web` container. It defaults to `true` when unset. The dashboard reads it when the container starts, so no image rebuild is needed; after changing it, apply it with:
+
+```
+docker compose up -d
+```
+
+`DEMO_MODE` is honoured by `ghcr.io/reportmate/web` images built after the dashboard started reading it at runtime. An older pinned `REPORTMATE_TAG` ignores it and always requires sign-in.
 
 For real sign-in and editable settings, set `DEMO_MODE=false` and provide the Entra ID variables (`AZURE_AD_CLIENT_ID`, `AZURE_AD_CLIENT_SECRET`, `AZURE_AD_TENANT_ID`, `NEXTAUTH_URL`) to the `web` service, and set `SETTINGS_ADMIN_ROLES` to your admin role.
 
