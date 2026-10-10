@@ -26,7 +26,7 @@ Bring the stack up:
 docker compose up -d
 ```
 
-Open the dashboard at http://localhost:3000. The API is at http://localhost:8000 (health at `/api/v1/health`). PostgreSQL is seeded from `schema/init.sql` on first start.
+Open the dashboard at http://localhost:3000. The API is at http://localhost:8000 (health at `/api/v1/health`). PostgreSQL is created from `schema/init.sql` on first start, and the API brings it up to date when it starts (see [Schema](#schema)).
 
 ## What runs
 
@@ -68,7 +68,44 @@ To publish an AMI or Azure image instead, add an `amazon-ebs` or `azure-arm` sou
 
 ## Schema
 
-`schema/init.sql` is consolidated from the `terraform-azurerm-reportmate` migrations (base modular schema + archive feature + settings). The API also ensures indexes and the settings table idempotently on startup, so an existing database self-updates.
+The database schema has two owners:
+
+- `schema/init.sql` creates the tables the API writes to but does not create itself: `devices`, `events`, and one table per collection module (`system`, `hardware`, `peripherals` and the rest).
+- The API owns everything else. At startup it runs its Alembic migrations, which create its own tables (`usage_history`, `api_keys`, `app_settings`, `ingest_failures` and others), add derived columns, and manage indexes. Nothing in `init.sql` repeats them.
+
+CI starts the published API image on `schema/init.sql`, both on a new database and on one upgraded from an earlier version of this file, and sends a check-in carrying every module. It runs weekly as well as on each change, so a new API release that needs a table this file lacks fails here.
+
+## Upgrading an existing database
+
+Postgres runs `schema/init.sql` only when the data volume is empty, so a later change to the file never reaches a database that already exists. Every statement in it is idempotent, so the upgrade is to run it again against the running database. It adds what is missing and leaves your data alone.
+
+Get the current files:
+
+```
+git pull
+```
+
+Apply the schema to the running database:
+
+```
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U reportmate -d reportmate < schema/init.sql
+```
+
+Pull the images and restart, so the API runs its own migrations:
+
+```
+docker compose pull && docker compose up -d
+```
+
+Confirm the upgrade by checking that the `platform` column and the `peripherals` table exist:
+
+```
+docker compose exec postgres psql -U reportmate -d reportmate -c '\d peripherals' -c "SELECT column_name FROM information_schema.columns WHERE table_name = 'devices' AND column_name = 'platform'"
+```
+
+On the Packer appliance the stack lives in `/opt/reportmate`, so run the same commands there with `sudo`, copying the new `schema/init.sql` in first.
+
+Run the upgrade whenever `schema/init.sql` changes. A database created from an earlier version of the file has no `devices.platform` column and no `peripherals` table, so current API images answer every check-in with a server error and store no devices until it is upgraded.
 
 ## Resetting
 
