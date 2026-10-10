@@ -48,7 +48,17 @@ docker compose up -d
 
 `DEMO_MODE` is honoured by `ghcr.io/reportmate/web` images built after the dashboard started reading it at runtime. An older pinned `REPORTMATE_TAG` ignores it and always requires sign-in.
 
-For real sign-in and editable settings, set `DEMO_MODE=false` and provide the Entra ID variables (`AZURE_AD_CLIENT_ID`, `AZURE_AD_CLIENT_SECRET`, `AZURE_AD_TENANT_ID`, `NEXTAUTH_URL`) to the `web` service, and set `SETTINGS_ADMIN_ROLES` to your admin role.
+For real sign-in and editable settings, set `DEMO_MODE=false` and provide the
+Entra ID variables (`AZURE_AD_CLIENT_ID`, `AZURE_AD_CLIENT_SECRET`,
+`AZURE_AD_TENANT_ID`, `NEXTAUTH_URL`) to the `web` service.
+
+Admin access is not configured by an environment variable. The dashboard
+checks for the literal role `admin` in the `roles` claim of the signed-in
+user's token. Define an app role with the value `admin` on your Entra app
+registration and assign it to the users or groups who should administer the
+instance; they must sign out and back in for the new claim to appear. Users
+without that role can sign in and read the dashboard, but settings stay
+read-only.
 
 ## Pinning a version
 
