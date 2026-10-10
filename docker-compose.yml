@@ -14,7 +14,10 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./schema/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U reportmate -d reportmate"]
+      # Probe over TCP: while the image runs schema/init.sql on a new volume,
+      # its temporary server listens on the Unix socket only, so a socket probe
+      # would report ready and let the API migrate a half-built schema.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U reportmate -d reportmate"]
       interval: 10s
       timeout: 5s
       retries: 5

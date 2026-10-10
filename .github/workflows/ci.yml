@@ -2,14 +2,18 @@ name: CI
 
 # Validates the self-host appliance definition. This repo CONSUMES the published
 # GHCR images (ghcr.io/reportmate/web + /api) -- it does not build or publish
-# them -- so there is no image publish step here. CI just checks that the
-# compose file, the Packer template, and the provisioning script are well-formed.
+# them -- so there is no image publish step here. CI checks that the compose
+# file, the Packer template, and the provisioning script are well-formed, and
+# that the published API image can store a full check-in on schema/init.sql.
+# The weekly run catches a new API release that needs schema this repo lacks.
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -43,3 +47,107 @@ jobs:
 
       - name: ShellCheck provisioning script
         run: shellcheck --severity=error packer/setup.sh
+
+  schema:
+    name: schema (${{ matrix.path }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # fresh:   a new volume, created from schema/init.sql.
+        # upgrade: a volume created from the first released init.sql, then
+        #          upgraded the way the README says.
+        path: [fresh, upgrade]
+    env:
+      API_URL: http://localhost:8000
+      PSQL: docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U reportmate -d reportmate
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure
+        run: |
+          cp .env.example .env
+          grep '^REPORTMATE_PASSPHRASE=' .env >> "$GITHUB_ENV"
+
+      - name: Start on the first released schema
+        if: matrix.path == 'upgrade'
+        run: |
+          git show a5f70b0:schema/init.sql > schema/init.sql
+          docker compose up -d postgres api
+          git checkout -- schema/init.sql
+
+      - name: Start on the current schema
+        if: matrix.path == 'fresh'
+        run: docker compose up -d postgres api
+
+      - name: Wait for the API
+        run: |
+          for _ in $(seq 60); do
+            curl -fsS "$API_URL/api/v1/health" && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Upgrade the database
+        if: matrix.path == 'upgrade'
+        run: |
+          $PSQL < schema/init.sql
+          docker compose restart api
+          for _ in $(seq 60); do
+            curl -fsS "$API_URL/api/v1/health" && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Send a check-in carrying every module
+        run: |
+          set -euo pipefail
+          serial=ci-smoke-test-device
+          modules="applications hardware identity installs inventory management network peripherals security system"
+
+          body=$(jq -n --arg serial "$serial" --arg modules "$modules" '{
+            metadata: {
+              deviceId: "00000000-0000-4000-8000-00000000c1c1",
+              serialNumber: $serial,
+              clientVersion: "0.0.0-ci",
+              platform: "Linux",
+              collectionType: "Full"
+            },
+            modules: ($modules | split(" ") | map({key: ., value: {collectedAt: "2026-01-01T00:00:00Z"}}) | from_entries)
+          }')
+
+          curl -sS --fail-with-body -X POST "$API_URL/api/v1/events" \
+            -H "Content-Type: application/json" \
+            -H "X-Client-Passphrase: $REPORTMATE_PASSPHRASE" \
+            --data "$body" | tee response.json
+          echo
+
+          failed=0
+          for m in $modules; do
+            if ! jq -e --arg m "$m" '.modules_processed | index($m)' response.json > /dev/null; then
+              echo "::error::the API did not store the $m module"
+              failed=1
+            fi
+          done
+
+          platform=$($PSQL -Atc "SELECT platform FROM devices WHERE serial_number = '$serial'")
+          if [ "$platform" != "Linux" ]; then
+            echo "::error::devices.platform is '$platform', expected 'Linux'"
+            failed=1
+          fi
+
+          # Deletion touches every module table the API knows, including the
+          # ones current clients no longer send.
+          curl -sS --fail-with-body -X DELETE "$API_URL/api/v1/device/$serial?confirm=true" \
+            -H "X-Client-Passphrase: $REPORTMATE_PASSPHRASE"
+          echo
+
+          exit "$failed"
+
+      - name: API log
+        if: always()
+        run: docker compose logs api
