@@ -5,6 +5,8 @@ Run ReportMate on your own infrastructure: the Next.js dashboard, the FastAPI in
 - **Docker Compose** — pull the published images and run the stack (recommended).
 - **Packer appliance** — bake the same stack into a VM image (qcow2/AMI/Azure) for appliance-style deploys.
 
+How the stack is put together and how changes are verified: [wiki](wiki/README.md).
+
 Images are published to GitHub Container Registry:
 
 - `ghcr.io/reportmate/web`
